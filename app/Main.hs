@@ -20,12 +20,15 @@ data GameState = Game
   deriving (Show)
 
 -- Window settings
+scaleFactor :: Float
+scaleFactor = 3
+
 windowWidth, windowHeight :: Int
-windowWidth = 300
-windowHeight = 300
+windowWidth = 300 * round scaleFactor
+windowHeight = 300 * round scaleFactor
 
 windowOffsetX, windowOffsetY :: Int
-windowOffsetX = 10
+windowOffsetX = 10 * round scaleFactor
 windowOffsetY = 0
 
 windowMiddle :: Float
@@ -49,21 +52,24 @@ playerOffsetX :: Float
 playerOffsetX = windowMiddle - (fromIntegral $ windowOffsetX * 2)
 
 paddleWidth :: Float
-paddleWidth = 10
+paddleWidth = 10 * scaleFactor
 
 paddleHeight :: Float
-paddleHeight = 50
+paddleHeight = 50 * scaleFactor
+
+paddleTolerance :: Float
+paddleTolerance = 10 * scaleFactor
 
 ballRadius :: Radius
-ballRadius = 5
+ballRadius = 3 * scaleFactor
 
 -- Game settings
 
 angleSensitivity :: Float
-angleSensitivity = 25
+angleSensitivity = 25 * scaleFactor
 
 ballSpeed :: Float
-ballSpeed = 50
+ballSpeed = 50 * scaleFactor
 
 initialState :: GameState
 initialState =
@@ -82,11 +88,12 @@ render game =
   pictures
     [ ball,
       net,
+      scoreCounter,
       makePaddle $ paddle1Position game,
       makePaddle $ paddle2Position game
     ]
   where
-    ball = uncurry translate (ballPosition game) $ color ballColor $ circleSolid 5
+    ball = uncurry translate (ballPosition game) $ color ballColor $ circleSolid ballRadius
     ballColor = white
 
     -- like ping pong net
@@ -94,20 +101,14 @@ render game =
     net =
       translate 0 0 $
         color white $
-          rectangleSolid ballRadius (fromIntegral windowHeight)
+          rectangleSolid (ballRadius / 2) (fromIntegral windowHeight)
 
     makePaddle :: Position -> Picture
     makePaddle (x, y) = pictures
       [ translate x y $ color white $ rectangleSolid paddleWidth paddleHeight ]
 
--- Functions
-moveBall :: Float -> GameState -> GameState
-moveBall seconds game = game {ballPosition = (x', y')}
-  where
-    (x, y) = ballPosition game
-    (vx, vy) = ballVelocity game
-    x' = x + vx * seconds
-    y' = y + vy * seconds
+    scoreCounter :: Picture
+    scoreCounter = translate (- windowMiddle / 2) 0 $ color white $ text $ show (player1Score game) ++ " - " ++ show (player2Score game)
 
 -- Game engine
 fps :: Int
@@ -117,9 +118,18 @@ main :: IO ()
 main = play window background fps initialState render handleKeys update
 
 update :: Float -> GameState -> GameState
-update seconds = wallBounce . paddleBounce . moveBall seconds
+update seconds = endzoneHandler . wallBounce . paddleBounce . moveBall seconds
 
 -- Game logic
+
+moveBall :: Float -> GameState -> GameState
+moveBall seconds game = game {ballPosition = (x', y')}
+  where
+    (x, y) = ballPosition game
+    (vx, vy) = ballVelocity game
+    x' = x + vx * seconds
+    y' = y + vy * seconds
+
 paddleBounce :: GameState -> GameState
 paddleBounce game = game {ballVelocity = (vx', vy'), paddlesCooldown = cooldown }
   where
@@ -133,8 +143,10 @@ calculateBounceY game = vy'
   where
     (_, vy) = ballVelocity game
     -- calculate the new velocity based on the position of the ball and where it hit the paddle
-    distAwayFromMiddle = snd (ballPosition game) - snd (paddle1Position game)
-    vy' = distAwayFromMiddle / (paddleHeight / 2) * (-angleSensitivity)
+    distAwayFromMiddle = if (fst $ ballPosition game) > 0 
+      then snd (ballPosition game) - snd (paddle2Position game) 
+      else snd (ballPosition game) - snd (paddle1Position game)
+    vy' = distAwayFromMiddle / (paddleHeight / 2) * angleSensitivity
 
 paddleCollision :: GameState -> Bool
 paddleCollision game = leftCollision || rightCollision
@@ -142,8 +154,8 @@ paddleCollision game = leftCollision || rightCollision
     (x, y) = ballPosition game
     (p1x, p1y) = paddle1Position game
     (p2x, p2y) = paddle2Position game
-    withinPaddle1 = (y + ballRadius) <= p1y + paddleHeight / 2 && (y - ballRadius) >= p1y - paddleHeight / 2
-    withinPaddle2 = (y + ballRadius) <= p2y + paddleHeight / 2 && (y - ballRadius) >= p2y - paddleHeight / 2
+    withinPaddle1 = (y + ballRadius) <= p1y + paddleHeight / 2 + paddleTolerance && (y - ballRadius) >= p1y - paddleHeight / 2 - paddleTolerance
+    withinPaddle2 = (y + ballRadius) <= p2y + paddleHeight / 2 + paddleTolerance && (y - ballRadius) >= p2y - paddleHeight / 2 - paddleTolerance
     withinRange1 = (x - ballRadius) <= p1x && (x - ballRadius) >= p1x - paddleWidth
     withinRange2 = (x + ballRadius) >= p2x && (x + ballRadius) <= p2x + paddleWidth
     leftCollision = withinRange1 && withinPaddle1
@@ -160,6 +172,21 @@ wallCollision (_, y) = topCollision || bottomCollision
   where
     topCollision = (y + ballRadius) >= windowTop
     bottomCollision = (y - ballRadius) <= windowBottom
+
+endzoneHandler :: GameState -> GameState
+endzoneHandler game = newGame
+  where
+    (x, _) = ballPosition game
+    player1Score' = if endzoneCollision game then player1Score game + 1 else player1Score game
+    player2Score' = if endzoneCollision game then player2Score game + 1 else player2Score game
+    newGame = if endzoneCollision game then initialState {player1Score = player1Score', player2Score = player2Score'} else game
+
+endzoneCollision :: GameState -> Bool
+endzoneCollision game = leftCollision || rightCollision
+  where
+    (x, _) = ballPosition game
+    leftCollision = (x - ballRadius) <= (- windowMiddle - fromIntegral windowOffsetX)
+    rightCollision = (x + ballRadius) >= windowMiddle + fromIntegral windowOffsetX
 
 -- Event handling
 handleKeys :: Event -> GameState -> GameState
