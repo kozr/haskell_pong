@@ -181,15 +181,20 @@ endzoneHandler :: GameState -> GameState
 endzoneHandler game = newGame
   where
     (x, _) = ballPosition game
-    player1Score' = if endzoneCollision game then player1Score game + 1 else player1Score game
-    player2Score' = if endzoneCollision game then player2Score game + 1 else player2Score game
-    newGame = if endzoneCollision game then initialState {player1Score = player1Score', player2Score = player2Score'} else game
+    player1Score' = if rightEndzoneCollision game then player1Score game + 1 else player1Score game
+    player2Score' = if leftEndzoneCollision game then player2Score game + 1 else player2Score game
+    newGame = if leftEndzoneCollision game || rightEndzoneCollision game then initialState {player1Score = player1Score', player2Score = player2Score'} else game
 
-endzoneCollision :: GameState -> Bool
-endzoneCollision game = leftCollision || rightCollision
+leftEndzoneCollision :: GameState -> Bool
+leftEndzoneCollision game = leftCollision
   where
     (x, _) = ballPosition game
     leftCollision = (x - ballRadius) <= (- windowMiddle - fromIntegral windowOffsetX)
+
+rightEndzoneCollision :: GameState -> Bool
+rightEndzoneCollision game = rightCollision
+  where
+    (x, _) = ballPosition game
     rightCollision = (x + ballRadius) >= windowMiddle + fromIntegral windowOffsetX
 
 -- Event handling
