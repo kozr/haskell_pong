@@ -59,11 +59,17 @@ ballRadius = 5
 
 -- Game settings
 
+angleSensitivity :: Float
+angleSensitivity = 25
+
+ballSpeed :: Float
+ballSpeed = 50
+
 initialState :: GameState
 initialState =
   Game
-    { ballPosition = (10, (-10)),
-      ballVelocity = (30, 10),
+    { ballPosition = (0, 0),
+      ballVelocity = (ballSpeed, 0),
       paddle1Position = (- playerOffsetX, 0),
       paddle2Position = (playerOffsetX, 0),
       paddlesCooldown = 0,
@@ -115,11 +121,20 @@ update seconds = wallBounce . paddleBounce . moveBall seconds
 
 -- Game logic
 paddleBounce :: GameState -> GameState
-paddleBounce game = game {ballVelocity = (vx', vy), paddlesCooldown = cooldown }
+paddleBounce game = game {ballVelocity = (vx', vy'), paddlesCooldown = cooldown }
   where
     (vx, vy) = ballVelocity game
+    cooldown = if paddleCollision game then 5 else max 0 (paddlesCooldown game - 1) -- To prevent the ball from bouncing off the paddle multiple times
     vx' = if paddleCollision game && paddlesCooldown game == 0 then (- vx) else vx
-    cooldown = if paddleCollision game then 10 else max 0 (paddlesCooldown game - 1) -- To prevent the ball from bouncing off the paddle multiple times
+    vy' = if paddleCollision game then calculateBounceY game else vy
+
+calculateBounceY :: GameState -> Float
+calculateBounceY game = vy'
+  where
+    (_, vy) = ballVelocity game
+    -- calculate the new velocity based on the position of the ball and where it hit the paddle
+    distAwayFromMiddle = snd (ballPosition game) - snd (paddle1Position game)
+    vy' = distAwayFromMiddle / (paddleHeight / 2) * (-angleSensitivity)
 
 paddleCollision :: GameState -> Bool
 paddleCollision game = leftCollision || rightCollision
@@ -129,7 +144,7 @@ paddleCollision game = leftCollision || rightCollision
     (p2x, p2y) = paddle2Position game
     withinPaddle1 = (y + ballRadius) <= p1y + paddleHeight / 2 && (y - ballRadius) >= p1y - paddleHeight / 2
     withinPaddle2 = (y + ballRadius) <= p2y + paddleHeight / 2 && (y - ballRadius) >= p2y - paddleHeight / 2
-    withinRange1 = (x - ballRadius) <= p1x && (x - ballRadius) >= p1x + paddleWidth
+    withinRange1 = (x - ballRadius) <= p1x && (x - ballRadius) >= p1x - paddleWidth
     withinRange2 = (x + ballRadius) >= p2x && (x + ballRadius) <= p2x + paddleWidth
     leftCollision = withinRange1 && withinPaddle1
     rightCollision = withinRange2 && withinPaddle2
