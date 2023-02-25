@@ -103,10 +103,13 @@ render game =
         color white $
           rectangleSolid (ballRadius / 2) (fromIntegral windowHeight)
 
+    -- render a paddle
     makePaddle :: Position -> Picture
-    makePaddle (x, y) = pictures
-      [ translate x y $ color white $ rectangleSolid paddleWidth paddleHeight ]
+    makePaddle (x, y) =
+      pictures
+        [translate x y $ color white $ rectangleSolid paddleWidth paddleHeight]
 
+    -- render the score counter
     scoreCounter :: Picture
     scoreCounter = translate (- windowMiddle / 2) 0 $ color white $ text $ show (player1Score game) ++ " - " ++ show (player2Score game)
 
@@ -131,7 +134,7 @@ moveBall seconds game = game {ballPosition = (x', y')}
     y' = y + vy * seconds
 
 paddleBounce :: GameState -> GameState
-paddleBounce game = game {ballVelocity = (vx', vy'), paddlesCooldown = cooldown }
+paddleBounce game = game {ballVelocity = (vx', vy'), paddlesCooldown = cooldown}
   where
     (vx, vy) = ballVelocity game
     cooldown = if paddleCollision game then 5 else max 0 (paddlesCooldown game - 1) -- To prevent the ball from bouncing off the paddle multiple times
@@ -143,9 +146,10 @@ calculateBounceY game = vy'
   where
     (_, vy) = ballVelocity game
     -- calculate the new velocity based on the position of the ball and where it hit the paddle
-    distAwayFromMiddle = if (fst $ ballPosition game) > 0 
-      then snd (ballPosition game) - snd (paddle2Position game) 
-      else snd (ballPosition game) - snd (paddle1Position game)
+    distAwayFromMiddle =
+      if (fst $ ballPosition game) > 0
+        then snd (ballPosition game) - snd (paddle2Position game)
+        else snd (ballPosition game) - snd (paddle1Position game)
     vy' = distAwayFromMiddle / (paddleHeight / 2) * angleSensitivity
 
 paddleCollision :: GameState -> Bool
@@ -154,12 +158,12 @@ paddleCollision game = leftCollision || rightCollision
     (x, y) = ballPosition game
     (p1x, p1y) = paddle1Position game
     (p2x, p2y) = paddle2Position game
-    withinPaddle1 = (y + ballRadius) <= p1y + paddleHeight / 2 + paddleTolerance && (y - ballRadius) >= p1y - paddleHeight / 2 - paddleTolerance
-    withinPaddle2 = (y + ballRadius) <= p2y + paddleHeight / 2 + paddleTolerance && (y - ballRadius) >= p2y - paddleHeight / 2 - paddleTolerance
-    withinRange1 = (x - ballRadius) <= p1x && (x - ballRadius) >= p1x - paddleWidth
-    withinRange2 = (x + ballRadius) >= p2x && (x + ballRadius) <= p2x + paddleWidth
-    leftCollision = withinRange1 && withinPaddle1
-    rightCollision = withinRange2 && withinPaddle2
+    withinPaddleY1 = (y + ballRadius) <= p1y + paddleHeight / 2 + paddleTolerance && (y - ballRadius) >= p1y - paddleHeight / 2 - paddleTolerance
+    withinPaddleY2 = (y + ballRadius) <= p2y + paddleHeight / 2 + paddleTolerance && (y - ballRadius) >= p2y - paddleHeight / 2 - paddleTolerance
+    withinXRange1 = (x - ballRadius) <= p1x && (x - ballRadius) >= p1x - paddleWidth
+    withinXRange2 = (x + ballRadius) >= p2x && (x + ballRadius) <= p2x + paddleWidth
+    leftCollision = withinXRange1 && withinPaddleY1
+    rightCollision = withinXRange2 && withinPaddleY2
 
 wallBounce :: GameState -> GameState
 wallBounce game = game {ballVelocity = (vx, vy')}
@@ -189,11 +193,12 @@ endzoneCollision game = leftCollision || rightCollision
     rightCollision = (x + ballRadius) >= windowMiddle + fromIntegral windowOffsetX
 
 -- Event handling
+
 handleKeys :: Event -> GameState -> GameState
-handleKeys (EventKey (Char 'w') Down _ _) game = game {paddle1Position = (fst(paddle1Position game), min (windowTop - paddleHeight / 2) (snd(paddle1Position game) + 10))}
-handleKeys (EventKey (Char 's') Down _ _) game = game {paddle1Position = (fst(paddle1Position game), max (windowBottom + paddleHeight / 2) (snd(paddle1Position game) - 10))}
-handleKeys (EventKey (Char 'o') Down _ _) game = game {paddle2Position = (fst(paddle2Position game), min (windowTop - paddleHeight / 2) (snd(paddle2Position game) + 10))}
-handleKeys (EventKey (Char 'l') Down _ _) game = game {paddle2Position = (fst(paddle2Position game), max (windowBottom + paddleHeight / 2) (snd(paddle2Position game) - 10))}
+handleKeys (EventKey (Char 'w') Down _ _) game = game {paddle1Position = (fst (paddle1Position game), min (windowTop - paddleHeight / 2) (snd (paddle1Position game) + 10))}
+handleKeys (EventKey (Char 's') Down _ _) game = game {paddle1Position = (fst (paddle1Position game), max (windowBottom + paddleHeight / 2) (snd (paddle1Position game) - 10))}
+handleKeys (EventKey (Char 'o') Down _ _) game = game {paddle2Position = (fst (paddle2Position game), min (windowTop - paddleHeight / 2) (snd (paddle2Position game) + 10))}
+handleKeys (EventKey (Char 'l') Down _ _) game = game {paddle2Position = (fst (paddle2Position game), max (windowBottom + paddleHeight / 2) (snd (paddle2Position game) - 10))}
 handleKeys (EventKey (Char 'r') Down _ _) game = game {ballPosition = (0, 0)}
 handleKeys (EventKey (Char 't') Down _ _) game = game {ballVelocity = (- fst (ballVelocity game), snd (ballVelocity game))}
 handleKeys _ game = game
