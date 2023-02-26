@@ -1,5 +1,6 @@
 module Main where
 
+import System.Exit     ( exitSuccess )
 import Graphics.Gloss
 import Graphics.Gloss.Data.ViewPort
 import Graphics.Gloss.Interface.Pure.Game
@@ -8,6 +9,9 @@ type Radius = Float
 
 type Position = (Float, Float)
 
+data PaddleState = Still | MovingUp | MovingDown
+  deriving (Show, Eq)
+
 data GameState = Game
   { ballPosition :: Position,
     ballVelocity :: (Float, Float),
@@ -15,7 +19,9 @@ data GameState = Game
     paddle2Position :: Position,
     paddlesCooldown :: Int,
     player1Score :: Int,
-    player2Score :: Int
+    player2Score :: Int,
+    paddle1State :: PaddleState,
+    paddle2State :: PaddleState
   }
   deriving (Show)
 
@@ -80,7 +86,9 @@ initialState =
       paddle2Position = (playerOffsetX, 0),
       paddlesCooldown = 0,
       player1Score = 0,
-      player2Score = 0
+      player2Score = 0,
+      paddle1State = Still,
+      paddle2State = Still
     }
 
 render :: GameState -> Picture
@@ -121,7 +129,7 @@ main :: IO ()
 main = play window background fps initialState render handleKeys update
 
 update :: Float -> GameState -> GameState
-update seconds = endzoneHandler . wallBounce . paddleBounce . moveBall seconds
+update seconds = endzoneHandler . wallBounce . paddleBounce . movePaddle . moveBall seconds
 
 -- Game logic
 
@@ -132,6 +140,18 @@ moveBall seconds game = game {ballPosition = (x', y')}
     (vx, vy) = ballVelocity game
     x' = x + vx * seconds
     y' = y + vy * seconds
+
+movePaddle :: GameState -> GameState
+movePaddle game = game {paddle1Position = paddle1Position', paddle2Position = paddle2Position'}
+  where
+    paddle1Position'
+      | paddle1State game == MovingUp     = (fst (paddle1Position game), min (windowTop - paddleHeight / 2) (snd (paddle1Position game) + 2))
+      | paddle1State game == MovingDown   = (fst (paddle1Position game), max (windowBottom + paddleHeight / 2) (snd (paddle1Position game) - 2))
+      | otherwise                         = paddle1Position game
+    paddle2Position' 
+      | paddle2State game == MovingUp     = (fst (paddle2Position game), min (windowTop - paddleHeight / 2) (snd (paddle2Position game) + 2))
+      | paddle2State game == MovingDown   = (fst (paddle2Position game), max (windowBottom + paddleHeight / 2) (snd (paddle2Position game) - 2))
+      | otherwise                         = paddle2Position game
 
 paddleBounce :: GameState -> GameState
 paddleBounce game = game {ballVelocity = (vx', vy'), paddlesCooldown = cooldown}
@@ -193,12 +213,15 @@ endzoneCollision game = leftCollision || rightCollision
     rightCollision = (x + ballRadius) >= windowMiddle + fromIntegral windowOffsetX
 
 -- Event handling
-
 handleKeys :: Event -> GameState -> GameState
-handleKeys (EventKey (Char 'w') Down _ _) game = game {paddle1Position = (fst (paddle1Position game), min (windowTop - paddleHeight / 2) (snd (paddle1Position game) + 10))}
-handleKeys (EventKey (Char 's') Down _ _) game = game {paddle1Position = (fst (paddle1Position game), max (windowBottom + paddleHeight / 2) (snd (paddle1Position game) - 10))}
-handleKeys (EventKey (Char 'o') Down _ _) game = game {paddle2Position = (fst (paddle2Position game), min (windowTop - paddleHeight / 2) (snd (paddle2Position game) + 10))}
-handleKeys (EventKey (Char 'l') Down _ _) game = game {paddle2Position = (fst (paddle2Position game), max (windowBottom + paddleHeight / 2) (snd (paddle2Position game) - 10))}
+handleKeys (EventKey (Char 'w') Down _ _) game = game {paddle1State = MovingUp}
+handleKeys (EventKey (Char 'w') Up _ _) game = game {paddle1State = Still}
+handleKeys (EventKey (Char 's') Down _ _) game = game {paddle1State = MovingDown}
+handleKeys (EventKey (Char 's') Up _ _) game = game {paddle1State = Still}
+handleKeys (EventKey (Char 'o') Down _ _) game = game {paddle2State = MovingUp}
+handleKeys (EventKey (Char 'o') Up _ _) game = game {paddle2State = Still}
+handleKeys (EventKey (Char 'l') Down _ _) game = game {paddle2State = MovingDown}
+handleKeys (EventKey (Char 'l') Up _ _) game = game {paddle2State = Still}
 handleKeys (EventKey (Char 'r') Down _ _) game = game {ballPosition = (0, 0)}
 handleKeys (EventKey (Char 't') Down _ _) game = game {ballVelocity = (- fst (ballVelocity game), snd (ballVelocity game))}
 handleKeys _ game = game
