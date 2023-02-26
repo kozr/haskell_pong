@@ -1,6 +1,5 @@
 module Main where
 
-import System.Exit     ( exitSuccess )
 import Graphics.Gloss
 import Graphics.Gloss.Data.ViewPort
 import Graphics.Gloss.Interface.Pure.Game
@@ -81,7 +80,7 @@ initialState :: GameState
 initialState =
   Game
     { ballPosition = (0, 0),
-      ballVelocity = (ballSpeed, 0),
+      ballVelocity = (- ballSpeed, 0),
       paddle1Position = (- playerOffsetX, 0),
       paddle2Position = (playerOffsetX, 0),
       paddlesCooldown = 0,
@@ -129,7 +128,7 @@ main :: IO ()
 main = play window background fps initialState render handleKeys update
 
 update :: Float -> GameState -> GameState
-update seconds = endzoneHandler . wallBounce . paddleBounce . movePaddle . moveBall seconds
+update seconds = endzoneHandler . wallBounce . paddleBounce . aiRespond . movePaddle . moveBall seconds
 
 -- Game logic
 
@@ -152,6 +151,15 @@ movePaddle game = game {paddle1Position = paddle1Position', paddle2Position = pa
       | paddle2State game == MovingUp     = (fst (paddle2Position game), min (windowTop - paddleHeight / 2) (snd (paddle2Position game) + 2))
       | paddle2State game == MovingDown   = (fst (paddle2Position game), max (windowBottom + paddleHeight / 2) (snd (paddle2Position game) - 2))
       | otherwise                         = paddle2Position game
+
+aiRespond :: GameState -> GameState
+aiRespond game
+  | y > b + 10   = game {paddle2State = MovingUp}
+  | y < b - 10   = game {paddle2State = MovingDown}
+  | otherwise   = game {paddle2State = Still}
+  where
+    (x, y) = ballPosition game
+    (a, b) = paddle2Position game
 
 paddleBounce :: GameState -> GameState
 paddleBounce game = game {ballVelocity = (vx', vy'), paddlesCooldown = cooldown}
@@ -223,10 +231,11 @@ handleKeys (EventKey (Char 'w') Down _ _) game = game {paddle1State = MovingUp}
 handleKeys (EventKey (Char 'w') Up _ _) game = game {paddle1State = Still}
 handleKeys (EventKey (Char 's') Down _ _) game = game {paddle1State = MovingDown}
 handleKeys (EventKey (Char 's') Up _ _) game = game {paddle1State = Still}
-handleKeys (EventKey (Char 'o') Down _ _) game = game {paddle2State = MovingUp}
-handleKeys (EventKey (Char 'o') Up _ _) game = game {paddle2State = Still}
-handleKeys (EventKey (Char 'l') Down _ _) game = game {paddle2State = MovingDown}
-handleKeys (EventKey (Char 'l') Up _ _) game = game {paddle2State = Still}
+-- keys for player2
+--handleKeys (EventKey (Char 'o') Down _ _) game = game {paddle2State = MovingUp}
+--handleKeys (EventKey (Char 'o') Up _ _) game = game {paddle2State = Still}
+--handleKeys (EventKey (Char 'l') Down _ _) game = game {paddle2State = MovingDown}
+--handleKeys (EventKey (Char 'l') Up _ _) game = game {paddle2State = Still}
 handleKeys (EventKey (Char 'r') Down _ _) game = game {ballPosition = (0, 0)}
 handleKeys (EventKey (Char 't') Down _ _) game = game {ballVelocity = (- fst (ballVelocity game), snd (ballVelocity game))}
 handleKeys _ game = game
